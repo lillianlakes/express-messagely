@@ -58,6 +58,13 @@ class User {
    * [{username, first_name, last_name}, ...] */
 
   static async all() {
+    const result = await db.query(
+      `SELECT username, first_name, last_name
+        FROM users
+        RETURNING username, first_name, last_name`
+    );
+
+    return result.rows;
   }
 
   /** Get: get user by username
@@ -70,6 +77,20 @@ class User {
    *          last_login_at } */
 
   static async get(username) {
+    const result = await db.query(
+      `SELECT username, first_name, last_name, 
+              phone, join_at, last_login_at
+        FROM users
+        WHERE username = $1
+        RETURNING username, first_name, last_name, 
+                  phone, join_at, last_login_at`, 
+        [username]
+    );
+    let user = result.rows[0];
+
+    if (!user) throw new NotFoundError(`No such user: ${username}`);
+
+    return user;
   }
 
   /** Return messages from this user.
@@ -81,6 +102,31 @@ class User {
    */
 
   static async messagesFrom(username) {
+    const mResults = await db.query(
+      `SELECT id, to_username, body, sent_at, read_at
+        FROM messages
+        WHERE from_username = $1
+        RETURNING id, to_username, body, sent_at, read_at`,
+      [username]
+    );
+    const messages = mResults.rows;
+
+    if (!messages.from_username) throw new NotFoundError(`No such user: ${username}`);
+
+    for (let message in messages){
+      const uResults = db.query(
+        `SELECT username, first_name, last_name, phone
+          FROM users
+          WHERE username = $1
+          RETURNING username, first_name, last_name, phone`,
+          [message.to_username]
+        );
+      const user = uResults.rows[0];
+      message.to_user = user; 
+    }
+    
+    return messages;
+
   }
 
   /** Return messages to this user.
