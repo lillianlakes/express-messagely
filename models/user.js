@@ -1,5 +1,9 @@
 "use strict";
 
+const db = require("../db");
+const bcrypt = require("bcrypt");
+const { UnauthorizedError, NotFoundError } = require("../expressError");
+
 /** User of the site. */
 
 class User {
@@ -9,16 +13,45 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
+    const result = await db.query(
+      `INSERT INTO users (username, password, first_name, last_name, phone)
+        VALUES ($1, $2, $3, $4, $5)
+       RETURNING username, password, first_name, last_name, phone`,
+       [username, password, first_name, last_name, phone]);
+
+    return result.rows[0];
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
 
   static async authenticate(username, password) {
+    const result = await db.query(
+      `SELECT password
+        FROM users
+        WHERE username = $1`,
+        [username]);
+    const user = result.rows[0];
+
+    if (user) {
+      return (await bcrypt.compare(password, user.password) === true);
+    }
+    throw new UnauthorizedError("Invalid user/password");
   }
 
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
+    const result = await db.query(
+      `UPDATE users
+        SET last_login_at = current_timestamp
+        WHERE username = $1
+        RETURNING username, last_login_at`,
+        [username]);
+    const user = result.rows[0];
+
+    if (!user) throw new NotFoundError(`No such user: ${username}`);
+
+    return user;
   }
 
   /** All: basic info on all users:
