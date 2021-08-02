@@ -18,8 +18,8 @@ class User {
     const hashed_password = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
 
     const result = await db.query(
-      `INSERT INTO users (username, password, first_name, last_name, phone, join_at)
-        VALUES ($1, $2, $3, $4, $5, current_timestamp)
+      `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
+        VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
        RETURNING username, password, first_name, last_name, phone`,
        [username, hashed_password, first_name, last_name, phone]);
 
@@ -53,8 +53,6 @@ class User {
         [username]);
     const user = result.rows[0];
 
-    console.log(user);
-
     if (!user) throw new NotFoundError(`No such user: ${username}`);
 
     return user;
@@ -71,8 +69,6 @@ class User {
 
     return result.rows;
   }
-
-//         RETURNING username, first_name, last_name
 
   /** Get: get user by username
    *
@@ -98,9 +94,6 @@ class User {
     return user;
   }
 
-  // RETURNING username, first_name, last_name, 
-  // phone, join_at, last_login_at
-
   /** Return messages from this user.
    *
    * [{id, to_user, body, sent_at, read_at}]
@@ -111,24 +104,21 @@ class User {
 
   static async messagesFrom(username) {
     const mResults = await db.query(
-      `SELECT id, from_username, to_username, body, sent_at, read_at
+      `SELECT id, to_username AS to_user, body, sent_at, read_at
         FROM messages
         WHERE from_username = $1`,
       [username]
     );
     const messages = mResults.rows;
-    // const messages = { ...mResults.rows, from_username: undefined };
+    
+    User.get(username);
 
-    // need to check if err handling works
-    // if this doesn't work, then get 'user' using a JOIN
-    if (!messages.from_username) throw new NotFoundError(`No such user: ${username}`);
-
-    for (let message in messages){
-      const uResults = db.query(
+    for (let message of messages){
+      const uResults = await db.query(
         `SELECT username, first_name, last_name, phone
           FROM users
           WHERE username = $1`,
-          [message.to_username]
+          [message.to_user]
         );
       const user = uResults.rows[0];
       message.to_user = user; 
@@ -136,9 +126,6 @@ class User {
     
     return messages;
   }
-
-  // RETURNING id, from_username, to_username, body, sent_at, read_at
-  // RETURNING username, first_name, last_name, phone
 
   /** Return messages to this user.
    *
@@ -150,24 +137,23 @@ class User {
 
   static async messagesTo(username) {
     const mResults = await db.query(
-      `SELECT id, from_username, body, sent_at, read_at
+      `SELECT id, from_username AS from_user, body, sent_at, read_at
         FROM messages
         WHERE to_username = $1`,
       [username]
     );
     const messages = mResults.rows;
 
-    // need to check if err handling works
-    // if this doesn't work, then get 'user' using a JOIN
-    if (!messages.to_username) throw new NotFoundError(`No such user: ${username}`);
+    User.get(username);
 
-    for (let message in messages){
-      const uResults = db.query(
+    for (let message of messages){
+      const uResults = await db.query(
         `SELECT username, first_name, last_name, phone
           FROM users
           WHERE username = $1`,
-          [message.from_username]
+          [message.from_user]
         );
+      
       const user = uResults.rows[0];
       message.from_user = user; 
     }
@@ -175,9 +161,6 @@ class User {
     return messages;
   }
 }
-
-// RETURNING id, from_username, body, sent_at, read_at
-// RETURNING username, first_name, last_name, phone
 
 
 module.exports = User;
