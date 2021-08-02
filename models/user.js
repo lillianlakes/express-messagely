@@ -103,15 +103,17 @@ class User {
 
   static async messagesFrom(username) {
     const mResults = await db.query(
-      `SELECT id, to_username, body, sent_at, read_at
+      `SELECT id, from_username, to_username, body, sent_at, read_at
         FROM messages
         WHERE from_username = $1
-        RETURNING id, to_username, body, sent_at, read_at`,
+        RETURNING id, from_username, to_username, body, sent_at, read_at`,
       [username]
     );
     const messages = mResults.rows;
+    // const messages = { ...mResults.rows, from_username: undefined };
 
-    if (!messages.from_username) throw new NotFoundError(`No such user: ${username}`);
+    // need to check if err handling works
+    if (!messages.from_username) throw new NotFoundError();
 
     for (let message in messages){
       const uResults = db.query(
