@@ -7,23 +7,19 @@ const { SECRET_KEY, BCRYPT_WORK_FACTOR } = require("../config")
 const { BadRequestError } = require("../expressError")
 const jwt = require("jsonwebtoken");
 const db = require("../db");
+const User = require("../models/user");
 
 
 /** POST /login: {username, password} => {token} */
-// TODO: call static method from User class in models
 router.post("/login", async function (req, res, next) {
   const { username, password } = req.body;
-  const result = await db.query(
-    "SELECT password FROM users WHERE username = $1",
-    [username]);
-  let user = result.rows[0];
 
-  if (user) {
-    if (await bcrypt.compare(password, user.password) === true) {
-      let token = jwt.sign({ username }, SECRET_KEY);
-      // TODO: call User.updateLoginTimestamp
-      return res.json({ token });
-    }
+  const userLoggedIn = await User.authenticate(username, password);
+
+  if (userLoggedIn) {
+    let token = jwt.sign({ username }, SECRET_KEY);
+    await User.updateLoginTimestamp(username);
+    return res.json({ token });
   }
   throw new BadRequestError("Invalid user/password");
 });
@@ -33,29 +29,16 @@ router.post("/login", async function (req, res, next) {
  *
  * {username, password, first_name, last_name, phone} => {token}.
  */
-// TODO: use method from User class
 router.post("/register", async function (req, res, next) {
   const { username, password, first_name, last_name, phone } = req.body;
-  const hashedPassword = await bcrypt.hash(
-    password, BCRYPT_WORK_FACTOR);
   
   try {
-    await db.query(
-      `INSERT INTO users (username, password, 
-                        first_name, last_name, phone, 
-                        join_at, last_login_at)
-         VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
-         RETURNING username`,
-      [username, hashedPassword, first_name, last_name, phone]);
-
+    await User.register({ username, password, first_name, last_name, phone });
     const token = jwt.sign({ username }, SECRET_KEY);
-    // TODO: call User.updateLoginTimestamp
-
     return res.json({ token });
   } catch (e){
     throw new BadRequestError("username already exists");
   }
-
 });
 
 module.exports = router;

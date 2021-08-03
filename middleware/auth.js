@@ -82,14 +82,13 @@ async function ensureSenderRecipient(req, res, next) {
          res.locals.user.username !== fromUsername)){
       throw new UnauthorizedError();
     } else {
-        // TODO: use res.locals.message .....
+      res.locals.message = message;
       return next();
     }
   } catch (err) {
     return next(err);
   }
 }
-
 
 
 module.exports = {

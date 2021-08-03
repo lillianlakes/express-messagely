@@ -20,9 +20,7 @@ const { ensureLoggedIn, ensureCorrectUser, ensureMessageRecipient, ensureSenderR
  **/
 
 router.get("/:id", ensureLoggedIn, ensureSenderRecipient, async function(req, res, next){
-  // make sure the user logged in is sender or recipient
-  // TODO: message = res.locals.message ..... refer to middleware line 86
-  const message = await Message.get(req.params.id);
+  const message = res.locals.message;
   return res.json({ message });
 })
 
