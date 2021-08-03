@@ -3,12 +3,14 @@
 const Router = require("express").Router;
 const router = new Router();
 const bcrypt = require("bcrypt");
-const { SECRET_KEY } = require("../config")
+const { SECRET_KEY, BCRYPT_WORK_FACTOR } = require("../config")
 const { BadRequestError } = require("../expressError")
+const jwt = require("jsonwebtoken");
+const db = require("../db");
 
 
 /** POST /login: {username, password} => {token} */
-
+// TODO: call static method from User class in models
 router.post("/login", async function (req, res, next) {
   const { username, password } = req.body;
   const result = await db.query(
@@ -19,10 +21,11 @@ router.post("/login", async function (req, res, next) {
   if (user) {
     if (await bcrypt.compare(password, user.password) === true) {
       let token = jwt.sign({ username }, SECRET_KEY);
+      // TODO: call User.updateLoginTimestamp
       return res.json({ token });
     }
   }
-  throw new UnauthorizedError("Invalid user/password");
+  throw new BadRequestError("Invalid user/password");
 });
 
 
@@ -30,12 +33,12 @@ router.post("/login", async function (req, res, next) {
  *
  * {username, password, first_name, last_name, phone} => {token}.
  */
-
+// TODO: use method from User class
 router.post("/register", async function (req, res, next) {
   const { username, password, first_name, last_name, phone } = req.body;
   const hashedPassword = await bcrypt.hash(
     password, BCRYPT_WORK_FACTOR);
-
+  
   try {
     await db.query(
       `INSERT INTO users (username, password, 
@@ -46,9 +49,10 @@ router.post("/register", async function (req, res, next) {
       [username, hashedPassword, first_name, last_name, phone]);
 
     const token = jwt.sign({ username }, SECRET_KEY);
+    // TODO: call User.updateLoginTimestamp
 
     return res.json({ token });
-  } catch {
+  } catch (e){
     throw new BadRequestError("username already exists");
   }
 

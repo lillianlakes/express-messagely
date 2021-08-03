@@ -21,7 +21,7 @@ class User {
       `INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
         VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
        RETURNING username, password, first_name, last_name, phone`,
-       [username, hashed_password, first_name, last_name, phone]);
+      [username, hashed_password, first_name, last_name, phone]);
 
     return result.rows[0];
   }
@@ -33,7 +33,7 @@ class User {
       `SELECT password
         FROM users
         WHERE username = $1`,
-        [username]);
+      [username]);
     const user = result.rows[0];
 
     if (user) {
@@ -50,7 +50,7 @@ class User {
         SET last_login_at = current_timestamp
         WHERE username = $1
         RETURNING last_login_at`,
-        [username]);
+      [username]);
     const user = result.rows[0];
 
     if (!user) throw new NotFoundError(`No such user: ${username}`);
@@ -84,8 +84,8 @@ class User {
       `SELECT username, first_name, last_name, 
               phone, join_at, last_login_at
         FROM users
-        WHERE username = $1`, 
-        [username]
+        WHERE username = $1`,
+      [username]
     );
     let user = result.rows[0];
 
@@ -103,29 +103,58 @@ class User {
    */
 
   static async messagesFrom(username) {
+    //   const mResults = await db.query(
+    //     `SELECT id, to_username AS to_user, body, sent_at, read_at
+    //       FROM messages
+    //       WHERE from_username = $1`,
+    //     [username]
+    //   );
+    //   const messages = mResults.rows;
+
+    //   User.get(username);
+
+    //   // TODO: JOIN with another query
+    //   for (let message of messages){
+    //     const uResults = await db.query(
+    //       `SELECT username, first_name, last_name, phone
+    //         FROM users
+    //         WHERE username = $1`,
+    //         [message.to_user]
+    //       );
+    //     const user = uResults.rows[0];
+    //     message.to_user = user; 
+    //   }
+
+    //   return messages;
+
     const mResults = await db.query(
-      `SELECT id, to_username AS to_user, body, sent_at, read_at
-        FROM messages
-        WHERE from_username = $1`,
+      `SELECT m.id, m.to_username, m.body, m.sent_at, m.read_at,
+            u.first_name, u.last_name, u.phone
+      FROM messages as m 
+      JOIN users as u ON m.to_username = u.username
+      WHERE m.from_username = $1`,
       [username]
     );
-    const messages = mResults.rows;
-    
-    User.get(username);
 
-    for (let message of messages){
-      const uResults = await db.query(
-        `SELECT username, first_name, last_name, phone
-          FROM users
-          WHERE username = $1`,
-          [message.to_user]
-        );
-      const user = uResults.rows[0];
-      message.to_user = user; 
-    }
-    
-    return messages;
+    // [{id, to_user, body, sent_at, read_at}]
+    // where to_user is
+    //  *   {username, first_name, last_name, phone}
+    return mResults.rows.map(r => ({
+      id: r.id,
+      to_user: {
+        username: r.username,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        phone: r.phone
+      },
+      body: r.body,
+      sent_at: r.sent_at,
+      read_at: r.read_at
+    }))
+
   }
+
+
 
   /** Return messages to this user.
    *
@@ -146,18 +175,18 @@ class User {
 
     User.get(username);
 
-    for (let message of messages){
+    for (let message of messages) {
       const uResults = await db.query(
         `SELECT username, first_name, last_name, phone
           FROM users
           WHERE username = $1`,
-          [message.from_user]
-        );
-      
+        [message.from_user]
+      );
+
       const user = uResults.rows[0];
-      message.from_user = user; 
+      message.from_user = user;
     }
-    
+
     return messages;
   }
 }
